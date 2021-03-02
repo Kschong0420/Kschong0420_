@@ -1,46 +1,56 @@
 const Discord = require('discord.js');
-
+require('dotenv').config();
 const client = new Discord.Client();
 
-const prefix = 'v ';
-
-const fs = require('fs');
-
-client.commands = new Discord.Collection
-
-const commandFiles = fs.readdirSync('./commands/').filter(file => file.endsWith('.js'));
-for(const file of commandFiles){
-    const command = require(`./commands/${file}`);
-
-    client.commands.set(command.name, command);
-}
+client.commands = new Discord.Collection();
+client.events = new Discord.Collection();
 
 client.once('ready', () => {
-    console.log('Vanilla is online!');
-    client.user.setActivity("Chocola",{
+    client.user.setActivity("Chocola", {
         type: "WATCHING"
+
     })
 });
 
-client.on('message', message =>{
-    if(!message.content.startsWith(prefix) || message.author.bot) return;
-
-    const args = message.content.slice(prefix.length).split("/ +/");
-    const command = args.shift().toLowerCase();
-
-    if(command === 'ping'){
-        client.commands.get('ping').execute(message, args);
-    } else if(command == 'vanilla'){
-        client.commands.get('vanilla').execute(message, args);
-    } else if(command == 'character'){
-        client.commands.get('character').execute(message, args);
-    } else if(command == 'help'){
-        client.commands.get('help').execute(message, args);
-    } else if(command == 'op'){
-        client.commands.get('op').execute(message, args);
-    } else if(command == 'ed'){
-        client.commands.get('ed').execute(message, args);
-    }
+client.on('messageDelete', async message => {
+    const logchannel = message.guild.channels.cache.find(ch => ch.name === "logchannel");
+    if (!logchannel) return
+    const embed = new Discord.MessageEmbed()
+        .setColor('#0352fc')
+        .setTitle('Deleted Message')
+        .addFields(
+            { name: 'Author', value: `${message.author.tag}` },
+            { name: 'Deleted Message', value: `${message.content}` },
+            { name: 'Channel', value: `${message.channel.name}` },
+        )
+        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+        .setTimestamp()
+        .setFooter(`User ID: ${message.author.id}`)
+    logchannel.send(embed);
 });
 
-client.login('ODE0MDM4MDk1MTI4MTY2NDAw.YDYCDQ.3cCFVix-Y5Kf0hrUUqb6Vnp8Pow');
+client.on('messageUpdate', async message => {
+    const logchannel =  message.guild.channels.cache.find(ch => ch.name === "logchannel");
+    if (!logchannel) return
+    const embed = new Discord.MessageEmbed()
+        .setColor('#fca503')
+        .setTitle('Edited Message')
+        .addFields(
+            { name: 'Author', value: `${message.author.tag}` },
+            { name: 'Message Before Edited', value: `${message.content}` },
+            { name: 'Guild', value: `${message.guild.name}` },
+            { name: 'Channel', value: `${message.channel.name}` },
+        )
+        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+        .setTimestamp()
+        .setFooter(`User ID: ${message.author.id}`)
+    logchannel.send(embed);
+});
+
+['command_handler', 'event_handler'].forEach(handler => {
+    require(`./handlers/${handler}`)(client, Discord);
+})
+
+client.login(process.env.DISCORD_TOKEN).catch(console.error());
+
+//{ name: 'Edited Message', value: `${message.edit.content}` },
