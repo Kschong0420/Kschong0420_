@@ -2,14 +2,20 @@ const Discord = require('discord.js');
 require('dotenv').config();
 const client = new Discord.Client();
 
+const memberCounter = require('./counters/member-counter')
+
 client.commands = new Discord.Collection();
 client.events = new Discord.Collection();
 
 client.once('ready', () => {
     client.user.setActivity("Chocola", {
         type: "WATCHING"
-
     })
+});
+
+client.once('ready', () => {
+    console.log('Member Counter Started Countdown!');
+    memberCounter(client)
 });
 
 client.on('messageDelete', async message => {
@@ -38,7 +44,6 @@ client.on('messageUpdate', async message => {
         .addFields(
             { name: 'Author', value: `${message.author.tag}` },
             { name: 'Message Before Edited', value: `${message.content}` },
-            { name: 'Guild', value: `${message.guild.name}` },
             { name: 'Channel', value: `${message.channel.name}` },
         )
         .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
@@ -51,6 +56,6 @@ client.on('messageUpdate', async message => {
     require(`./handlers/${handler}`)(client, Discord);
 })
 
-client.login(process.env.DISCORD_TOKEN).catch(console.error());
+client.login(process.env.DISCORD_TOKEN);
 
 //{ name: 'Edited Message', value: `${message.edit.content}` },
