@@ -95,6 +95,32 @@ client.on('message', async message => {
   }
 });
 
+client.afk = new Map();
+client.on("message", async message => {
+  if (message.author.bot) return;
+  if (message.channel.type === "dm") return;
+
+  let prefix = process.env.PREFIX;
+  let messageArray = message.content.split(" ");
+  let command = messageArray[0].toLowerCase();
+  let args = messageArray.slice(1);
+
+  // return message.channel.send(`**${user_tag}** is currently afk. Reason: ${key.reason}`);
+  // return message.reply(`you have been removed from the afk list!`).then(msg => msg.delete(5000));
+  const mentionedUser = message.mentions.users.first();
+  if (message.content.includes(message.mentions.members.first())) {
+    let mentioned = client.afk.get(message.mentions.users.first().id);
+    if (mentioned) message.channel.send(`**${mentionedUser.username}** is currently afk. Reason: ${mentioned.reason}`);
+  }
+  let afkcheck = client.afk.get(message.author.id);
+  if (afkcheck) return [client.afk.delete(message.author.username), message.reply(`you have been removed from the afk list!`).then(msg => msg.delete(5000))];
+
+  if (!command.startsWith(prefix)) return;
+
+  let cmd = client.commands.get(command.slice(prefix.length));
+  if (cmd) cmd.run(client, message, args);
+});
+
 ['command_handler', 'event_handler'].forEach(handler => {
   require(`./handlers/${handler}`)(client, Discord)
 })
@@ -108,3 +134,4 @@ client.login(process.env.DISCORD_TOKEN)
 // 1.codelyon  - newbie suitable tutorial 
 // 2.fusion terror - useful code and clear
 // 3.reconlx (and his npm package) - make bot more fun and fuction with lot of npm package
+
