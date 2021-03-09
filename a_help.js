@@ -23,7 +23,7 @@ module.exports = {
         );
 
         const cmds = commands.map((command) => {
-          let file = require(`./commands/${command}`);
+          let file = require(`./${command}`);
 
           if (!file.name) return "No command name.";
 
@@ -32,7 +32,7 @@ module.exports = {
           return `\`${name}\``;
         });
 
-        const data = new Object();
+        var data = new Object();
 
         data = {
           name: dir.toUpperCase(),
@@ -41,6 +41,22 @@ module.exports = {
 
         categories.push(data);
       });
+
+      function shorten (str, size) {
+        /*
+          shortens content into blocks of specified size
+        */
+        const numChunks = Math.ceil(str.length / size)
+        const chunks = new Array(numChunks)
+      
+        for (let i = 0, o = 0; i < numChunks; ++i, o += size) {
+          chunks[i] = str.substr(o, size)
+        }
+      
+        return chunks
+      }
+      
+      module.exports = shorten
 
       const embed = new MessageEmbed()
         .setTitle("📬 Need help? Here are all of my commands:")
