@@ -1,33 +1,33 @@
-const MessageEmbed = require("discord.js");
-const fs = require("fs");
-const prefix = process.env.PREFIX;
+const { MessageEmbed } = require("discord.js");
+const { readdirSync } = require("fs");
+const prefix = require("../config.json").prefix;
 
 module.exports = {
   name: "a_help",
   aliases : ['h'],
   description: "Shows all available bot commands.",
-   execute(client, message, args) {
+  async execute(client, message, args) {
 
-
+    //example : C:\Users\user\Desktop\backup\discord-bot-version-3.0.0\commands\8ball.js
     const roleColor =
       message.guild.me.displayHexColor === "#000000"
         ? "#ffffff"
         : message.guild.me.displayHexColor;
 
     if (!args[0]) {
-      const categories = [];
+      let categories = [];
 
-      fs.readdirSync("./commands/").forEach((dir) => {
-        const commands = fs.readdirSync(`../commands/${dir}/`).filter((file) =>
+      readdirSync("./commands/").forEach((dir) => {
+        const commands = readdirSync('./commands/').filter((file) =>
           file.endsWith(".js")
         );
 
         const cmds = commands.map((command) => {
-          const file = require(`../commands/${dir}/${command}`);
+          let file = require(`./commands/${command}`);
 
           if (!file.name) return "No command name.";
 
-          const name = file.name.replace(".js", "");
+          let name = file.name.replace(".js", "");
 
           return `\`${name}\``;
         });
@@ -101,6 +101,8 @@ module.exports = {
         .setTimestamp()
         .setColor(roleColor);
       return message.channel.send(embed);
+
+      
     }
   },
 };
