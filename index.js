@@ -1,25 +1,45 @@
 const Discord = require('discord.js')
+const DisTube = require("distube")
 require('dotenv').config()
 const client = new Discord.Client()
 const fetch = require('node-fetch')
 const querystring = require('querystring')
+const fs = require("fs")
 
 const memberCounter = require('./counters/member-counter')
+const config = require("./config.json")
+client.distube = new DisTube(client, { searchSongs: true, emitNewSongOnly: true, leaveOnFinish: false })
+client.emotes = config.emoji
+client.aliases = new Discord.Collection()
 
 client.commands = new Discord.Collection()
 client.events = new Discord.Collection()
 
+fs.readdir("./commands/", (err, files) => {
+  if (err) return console.log("Could not find any commands!")
+  const jsFiles = files.filter(f => f.split(".").pop() === "js")
+  if (jsFiles.length <= 0) return console.log("Could not find any commands!")
+  jsFiles.forEach(file => {
+      const cmd = require(`./commands/${file}`)
+      console.log(`Loaded ${file} ✅`)
+      client.commands.set(cmd.name, cmd)
+  })
+})
+
+//status
 client.once('ready', () => {
   client.user.setActivity('Chocola', {
     type: 'WATCHING'
   })
 })
 
+//remind membercount countdown
 client.once('ready', () => {
   console.log('Member Counter Started Countdown!')
   memberCounter(client)
 })
 
+//deleted message log
 client.on('messageDelete', async message => {
   const logchannel = message.guild.channels.cache.find(ch => ch.name === 'logchannel')
   if (!logchannel) return
@@ -37,6 +57,7 @@ client.on('messageDelete', async message => {
   logchannel.send(embed)
 })
 
+//updated message log
 client.on('messageUpdate', async message => {
   const logchannel = message.guild.channels.cache.find(ch => ch.name === 'logchannel')
   if (!logchannel) return
@@ -54,6 +75,7 @@ client.on('messageUpdate', async message => {
   logchannel.send(embed)
 })
 
+//urban
 client.on('message', async message => {
   const prefix = process.env.PREFIX
   const args = message.content.substring(prefix.length).split(' ')
@@ -95,6 +117,7 @@ client.on('message', async message => {
   }
 });
 
+//afk core
 client.afk = new Map();
 client.on("message", async message => {
   if (message.author.bot) return;
@@ -113,7 +136,7 @@ client.on("message", async message => {
     if (mentioned) message.channel.send(`**${mentionedUser.username}** is currently afk. Reason: ${mentioned.reason}`);
   }
   let afkcheck = client.afk.get(message.author.id);
-  if (afkcheck) return [client.afk.delete(message.author.username), message.reply(`you have been removed from the afk list!`).then(msg => msg.delete(5000))];
+  if (afkcheck) return [client.afk.delete(message.author.id), message.reply(`you have been removed from the afk list!`).then(msg => msg.delete(5000))];
 
   if (!command.startsWith(prefix)) return;
 
@@ -125,6 +148,62 @@ client.on("message", async message => {
   require(`./handlers/${handler}`)(client, Discord)
 })
 
+//remind music bot ready
+client.on("ready", () => {
+  console.log(`${client.user.tag} is ready to play music.`)
+//const server = client.voice.connections.size
+//client.user.setActivity({ type: "PLAYING", name: `music on ${server} servers` })
+})
+
+//music bot core require distube
+client.on("message", async message => {
+  const prefix = config.prefix
+  if (!message.content.startsWith(prefix)) return
+  const args = message.content.slice(prefix.length).trim().split(/ +/g)
+  const command = args.shift().toLowerCase()
+  const cmd = client.commands.get(command) || client.commands.get(client.aliases.get(command))
+  if (!cmd) return
+  if (cmd.inVoiceChannel && !message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`)
+  try {
+      cmd.run(client, message, args)
+  } catch (e) {
+      console.error(e)
+      message.reply(`Error: ${e}`)
+  }
+})
+
+const status = queue => `Volume: \`${queue.volume}%\` | Filter: \`${queue.filter || "Off"}\` | Loop: \`${queue.repeatMode ? queue.repeatMode === 2 ? "All Queue" : "This Song" : "Off"}\` | Autoplay: \`${queue.autoplay ? "On" : "Off"}\``
+client.distube
+  .on("playSong", (message, queue, song) => message.channel.send( //{
+    `${client.emotes.play} | Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}\n${status(queue)}`
+  ))
+//    const PlayEmbed = new Discord.MessageEmbed()
+//    .setDescription(`**${client.emotes.play} | Playing \`${song.name}\` - \`${song.formattedDuration}\`**`)
+//    .addField(`\nRequested by: ${song.user.username}`, `\n${status(queue)}`)
+//    message.channel.send(PlayEmbed)})
+  .on("addSong", (message, queue, song) => message.channel.send(
+    `${client.emotes.success} | Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user}`
+  ))
+  .on("playList", (message, queue, playlist, song) => message.channel.send(
+    `${client.emotes.play} | Play \`${playlist.title}\` playlist (${playlist.total_items} songs).\nRequested by: ${song.user}\nNow playing \`${song.name}\` - \`${song.formattedDuration}\`\n${status(queue)}`
+  ))
+  .on("addList", (message, queue, playlist) => message.channel.send(
+    `${client.emotes.success} | Added \`${playlist.title}\` playlist (${playlist.total_items} songs) to queue\n${status(queue)}`
+  ))
+  // DisTubeOptions.searchSongs = true
+  .on("searchResult", (message, result) => {
+    let i = 0 
+    const SearchEmbed = new Discord.MessageEmbed()
+    .setTitle('**Song Searched List**')
+    .setDescription(`**Choose an option from below**\n${result.map(song => `**${++i}**. ${song.name} - \`${song.formattedDuration}\``).join("\n")}\n`)
+    .setFooter('Enter anything else or wait 60 seconds to cancel')
+    message.channel.send(SearchEmbed)
+  })
+  // DisTubeOptions.searchSongs = true
+  .on("searchCancel", message => message.channel.send(`${client.emotes.error} | Searching canceled`))
+  .on("error", (message, err) => message.channel.send(`${client.emotes.error} | An error encountered: ${err}`))
+
+
 client.login(process.env.DISCORD_TOKEN)
 
 // { name: 'Edited Message', value: `${message.edit.content}` },
@@ -134,4 +213,6 @@ client.login(process.env.DISCORD_TOKEN)
 // 1.codelyon  - newbie suitable tutorial 
 // 2.fusion terror - useful code and clear
 // 3.reconlx (and his npm package) - make bot more fun and fuction with lot of npm package
+
+//made by Kschong0420_
 
